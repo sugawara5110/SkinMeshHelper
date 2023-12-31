@@ -427,11 +427,16 @@ Skin_VERTEX_Set SkinMeshHelper::setVertex(bool lclOn, bool axisOn, bool VerCente
 
 	vset.pvVB = new Skin_VERTEX * [numMesh];
 	vset.pvVB_M = new Vertex_M * [numMesh];
+	vset.newIndex = new uint32_t * *[numMesh];
+	vset.NumNewIndex = new uint32_t * [numMesh];
 
 	for (int m = 0; m < numMesh; m++) {
 
 		FbxLoader* fbL = fbx[0].fbxL;
 		FbxMeshNode* mesh = fbL->getFbxMeshNode(m);//メッシュ毎に処理する
+
+		//分割後のIndex生成
+		splitIndex(mesh->getNumMaterial(), mesh, m, vset);
 
 		Skin_VERTEX* tmpVB = new Skin_VERTEX[mesh->getNumVertices()];
 		//ボーンウエイト
@@ -534,6 +539,50 @@ Skin_VERTEX_Set SkinMeshHelper::setVertex(bool lclOn, bool axisOn, bool VerCente
 	return vset;
 }
 
+void SkinMeshHelper::splitIndex(uint32_t numMaterial, FbxMeshNode* mesh, int m, Skin_VERTEX_Set& vset) {
+
+	//ポリゴン分割後のIndex数カウント
+	vset.NumNewIndex[m] = new uint32_t[numMaterial];
+	uint32_t* numNewIndex = vset.NumNewIndex[m];
+
+	memset(numNewIndex, 0, sizeof(uint32_t) * numMaterial);
+
+	for (uint32_t i = 0; i < mesh->getNumPolygon(); i++) {
+		uint32_t currentMatNo = mesh->getMaterialNoOfPolygon(i);
+		uint32_t pSize = mesh->getPolygonSize(i);
+		if (pSize >= 3) {
+			numNewIndex[currentMatNo] += (pSize - 2) * 3;
+		}
+	}
+
+	//分割後のIndex生成
+	vset.newIndex[m] = new uint32_t * [numMaterial];
+	uint32_t** newIndex = vset.newIndex[m];
+	for (uint32_t ind1 = 0; ind1 < numMaterial; ind1++) {
+		if (numNewIndex[ind1] <= 0) {
+			newIndex[ind1] = nullptr;
+			continue;
+		}
+		newIndex[ind1] = new uint32_t[numNewIndex[ind1]];
+	}
+	std::unique_ptr<uint32_t[]> indexCnt;
+	indexCnt = std::make_unique<uint32_t[]>(numMaterial);
+
+	int Icnt = 0;
+	for (uint32_t i = 0; i < mesh->getNumPolygon(); i++) {
+		uint32_t currentMatNo = mesh->getMaterialNoOfPolygon(i);
+		uint32_t pSize = mesh->getPolygonSize(i);
+		if (pSize >= 3) {
+			for (uint32_t ps = 0; ps < pSize - 2; ps++) {
+				newIndex[currentMatNo][indexCnt[currentMatNo]++] = Icnt;
+				newIndex[currentMatNo][indexCnt[currentMatNo]++] = Icnt + 1 + ps;
+				newIndex[currentMatNo][indexCnt[currentMatNo]++] = Icnt + 2 + ps;
+			}
+			Icnt += pSize;
+		}
+	}
+}
+
 void SkinMeshHelper::getBuffer(int num_end_frame, float* end_frame, bool singleMesh, bool deformer) {
 
 	using namespace CoordTf;
@@ -543,7 +592,6 @@ void SkinMeshHelper::getBuffer(int num_end_frame, float* end_frame, bool singleM
 	if (singleMesh)fbL->createFbxSingleMeshNode();
 	numMesh = fbL->getNumFbxMeshNode();
 	noUseMesh = std::make_unique<bool[]>(numMesh);
-	newIndex = new uint32_t * *[numMesh];
 	centerPos = std::make_unique<meshCenterPos[]>(numMesh);
 	numBone = new int[numMesh];
 	for (int i = 0; i < numMesh; i++) {
@@ -581,3 +629,63 @@ void SkinMeshHelper::getBuffer(int num_end_frame, float* end_frame, bool singleM
 	}
 }
 
+void SkinMeshHelper::noUseMeshIndex(int meshIndex) {
+	noUseMesh[meshIndex] = true;
+}
+
+bool SkinMeshHelper::GetFbxSub(char* szFileName, int ind) {
+	if (ind <= 0)return false;
+	return InitFBX(szFileName, ind);
+}
+
+bool SkinMeshHelper::GetFbxSubSetBinary(char* byteArray, unsigned int size, int ind) {
+	if (ind <= 0)return false;
+	return InitFBXSetBinary(byteArray, size, ind);
+}
+
+bool SkinMeshHelper::GetBuffer_Sub(int ind, float end_frame) {
+	float ef[1] = { end_frame };
+	return GetBuffer_Sub(ind, 1, ef);
+}
+
+bool SkinMeshHelper::GetBuffer_Sub(int ind, int num_end_frame, float* end_frame) {
+
+	fbx[ind].end_frame = std::make_unique<float[]>(num_end_frame);
+	memcpy(fbx[ind].end_frame.get(), end_frame, num_end_frame * sizeof(float));
+
+	int BoneNum = fbx[ind].fbxL->getNumNoneMeshDeformer();
+	if (BoneNum == 0) return false;
+
+	if (!m_ppSubAnimationBone) {
+		m_ppSubAnimationBone = new Deformer * [(FBX_PCS - 1) * maxNumBone];
+	}
+	return true;
+}
+
+void SkinMeshHelper::CreateFromFBX_SubAnimation(int ind) {
+	int loopind = 0;
+	int searchCount = 0;
+	int name2Num = 0;
+	while (loopind < maxNumBone) {
+		int sa_ind = (ind - 1) * maxNumBone + loopind;
+		m_ppSubAnimationBone[sa_ind] = fbx[ind].fbxL->getNoneMeshDeformer(searchCount);
+		searchCount++;
+		const char* name = m_ppSubAnimationBone[sa_ind]->getName();
+		if (!strncmp("Skeleton", name, 8))continue;
+		char* name2 = &boneName[loopind * 255];//各Bone名の先頭アドレスを渡す
+		//Bone名に空白が含まれている場合最後の空白以降の文字から終端までの文字を比較する為,
+		//終端文字までポインタを進め, 終端から検査して空白位置手前まで比較する
+		while (*name != '\0')name++;//終端文字までポインタを進める
+		//終端文字までポインタを進める, 空白が含まれない文字の場合もあるので文字数カウントし,
+		//文字数で比較完了を判断する
+		while (*name2 != '\0') { name2++; name2Num++; }
+		while (*(--name) == *(--name2) && *name2 != ' ' && (--name2Num) > 0);
+		if (*name2 != ' ' && name2Num > 0) { name2Num = 0; continue; }
+		name2Num = 0;
+		loopind++;
+	}
+}
+
+void SkinMeshHelper::setDirectTime(float ti) {
+	directTime = ti;
+}

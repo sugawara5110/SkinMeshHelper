@@ -37,6 +37,8 @@ struct Vertex_M {
 struct Skin_VERTEX_Set {
 	Skin_VERTEX** pvVB = nullptr;
 	Vertex_M** pvVB_M = nullptr;
+	uint32_t*** newIndex = nullptr;
+	uint32_t** NumNewIndex = nullptr;
 };
 
 class SkinMeshHelper {
@@ -84,7 +86,6 @@ protected:
 	};
 
 	SHADER_GLOBAL_BONES sgb[2] = {};
-	uint32_t*** newIndex = nullptr;
 
 	//É{Å[Éì
 	int* numBone = nullptr;
@@ -123,6 +124,7 @@ protected:
 	void createAxis();
 	void AxisSw(bool axisOn);
 	void LclTransformation(FbxMeshNode* mesh, CoordTf::VECTOR3* vec);
+	void splitIndex(uint32_t numMaterial, FbxMeshNode* mesh, int meshIndex, Skin_VERTEX_Set& vset);
 
 	void getBuffer(int num_end_frame, float* end_frame, bool singleMesh, bool deformer);
 	Skin_VERTEX_Set setVertex(bool lclOn, bool axisOn, bool VerCentering);
@@ -131,13 +133,24 @@ protected:
 	~SkinMeshHelper();
 
 public:
+	void noUseMeshIndex(int meshIndex);
 	void ObjCentering(bool f, int ind);
 	void ObjCentering(float x, float y, float z, float thetaZ, float thetaY, float thetaX, int ind);
 	void ObjOffset(float x, float y, float z, float thetaZ, float thetaY, float thetaX, int ind);
 	void SetConnectStep(int ind, float step);
 	bool GetFbx(char* szFileName);
 	bool GetFbxSetBinary(char* byteArray, unsigned int size);
+
 	int32_t getMaxEndframe(int fbxIndex, int InternalAnimationIndex);
+	int getNumMesh() { return numMesh; }
+
+	bool GetFbxSub(char* szFileName, int ind);
+	bool GetFbxSubSetBinary(char* byteArray, unsigned int size, int ind);
+	bool GetBuffer_Sub(int ind, int num_end_frame, float* end_frame);
+	bool GetBuffer_Sub(int ind, float end_frame);
+	void CreateFromFBX_SubAnimation(int ind);
+
+	void setDirectTime(float ti);
 };
 
 #endif
