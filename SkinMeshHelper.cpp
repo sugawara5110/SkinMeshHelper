@@ -387,14 +387,20 @@ void SkinMeshHelper::SetConnectStep(int ind, float step) {
 	fbx[ind].connect_step = step;
 }
 
-bool SkinMeshHelper::GetFbx(char* szFileName) {
+void SkinMeshHelper::GetFbx(char* szFileName) {
 	//FBXローダーを初期化
-	return InitFBX(szFileName, 0);
+	if (!InitFBX(szFileName, 0))
+	{
+		throw std::runtime_error("FBXローダー初期化失敗");
+	}
 }
 
-bool SkinMeshHelper::GetFbxSetBinary(char* byteArray, unsigned int size) {
+void SkinMeshHelper::GetFbxSetBinary(char* byteArray, unsigned int size) {
 	//FBXローダーを初期化
-	return InitFBXSetBinary(byteArray, size, 0);
+	if (!InitFBXSetBinary(byteArray, size, 0))
+	{
+		throw std::runtime_error("FBXローダー初期化失敗");
+	}
 }
 
 int32_t SkinMeshHelper::getMaxEndframe(int fbxIndex, int InternalAnimationIndex) {
@@ -419,7 +425,7 @@ void SkinMeshHelper::AxisSw(bool axisOn) {
 	}
 }
 
-Skin_VERTEX_Set SkinMeshHelper::setVertex(bool lclOn, bool axisOn, bool VerCentering) {
+SkinMeshHelper::Skin_VERTEX_Set SkinMeshHelper::setVertex(bool lclOn, bool axisOn, bool VerCentering) {
 
 	AxisSw(axisOn);
 
@@ -633,33 +639,44 @@ void SkinMeshHelper::noUseMeshIndex(int meshIndex) {
 	noUseMesh[meshIndex] = true;
 }
 
-bool SkinMeshHelper::GetFbxSub(char* szFileName, int ind) {
-	if (ind <= 0)return false;
-	return InitFBX(szFileName, ind);
+void SkinMeshHelper::GetFbxSub(char* szFileName, int ind) {
+	if (ind <= 0) {
+		throw std::runtime_error("FBXローダー初期化失敗");
+	}
+
+	if (!InitFBX(szFileName, ind)) {
+		throw std::runtime_error("FBXローダー初期化失敗");
+	}
 }
 
-bool SkinMeshHelper::GetFbxSubSetBinary(char* byteArray, unsigned int size, int ind) {
-	if (ind <= 0)return false;
-	return InitFBXSetBinary(byteArray, size, ind);
+void SkinMeshHelper::GetFbxSubSetBinary(char* byteArray, unsigned int size, int ind) {
+	if (ind <= 0) {
+		throw std::runtime_error("FBXローダー初期化失敗");
+	}
+
+	if (!InitFBXSetBinary(byteArray, size, ind)) {
+		throw std::runtime_error("FBXローダー初期化失敗");
+	}
 }
 
-bool SkinMeshHelper::GetBuffer_Sub(int ind, float end_frame) {
+void SkinMeshHelper::GetBuffer_Sub(int ind, float end_frame) {
 	float ef[1] = { end_frame };
-	return GetBuffer_Sub(ind, 1, ef);
+	GetBuffer_Sub(ind, 1, ef);
 }
 
-bool SkinMeshHelper::GetBuffer_Sub(int ind, int num_end_frame, float* end_frame) {
+void SkinMeshHelper::GetBuffer_Sub(int ind, int num_end_frame, float* end_frame) {
 
 	fbx[ind].end_frame = std::make_unique<float[]>(num_end_frame);
 	memcpy(fbx[ind].end_frame.get(), end_frame, num_end_frame * sizeof(float));
 
 	int BoneNum = fbx[ind].fbxL->getNumNoneMeshDeformer();
-	if (BoneNum == 0) return false;
+	if (BoneNum == 0) {
+		throw std::runtime_error("FBXローダー初期化失敗");
+	}
 
 	if (!m_ppSubAnimationBone) {
 		m_ppSubAnimationBone = new Deformer * [(FBX_PCS - 1) * maxNumBone];
 	}
-	return true;
 }
 
 void SkinMeshHelper::CreateFromFBX_SubAnimation(int ind) {
@@ -688,4 +705,23 @@ void SkinMeshHelper::CreateFromFBX_SubAnimation(int ind) {
 
 void SkinMeshHelper::setDirectTime(float ti) {
 	directTime = ti;
+}
+
+FbxLoader* SkinMeshHelper::getFbxLoader() {
+	return fbx[0].fbxL;
+}
+
+int SkinMeshHelper::getNumBone(int index) {
+	if (!numBone) {
+		throw std::runtime_error("numBoneがnullです getBufferを呼び出してください");
+	}
+	return numBone[index];
+}
+
+SkinMeshHelper::meshCenterPos SkinMeshHelper::getMeshCenterPos(int index) {
+	return centerPos[index];
+}
+
+bool SkinMeshHelper::isNoUseMesh(int index) {
+	return noUseMesh[index];
 }

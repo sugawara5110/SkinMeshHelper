@@ -10,40 +10,41 @@
 #include "../FbxLoader/FbxLoader.h"
 #include "../CoordTf/CoordTf.h"
 #include <memory>
-
-#define MAX_BONES 256
-#define FBX_PCS 32
-
-struct Skin_VERTEX {
-	CoordTf::VECTOR3 vPos = {};
-	CoordTf::VECTOR3 vNorm = {};
-	CoordTf::VECTOR3 vTangent = {};
-	CoordTf::VECTOR3 vGeoNorm = {};
-	CoordTf::VECTOR2 vTex0 = {};
-	CoordTf::VECTOR2 vTex1 = {};
-	uint32_t bBoneIndex[4] = {};
-	float bBoneWeight[4] = {};
-};
-
-struct Vertex_M {
-	CoordTf::VECTOR3 Pos = {};
-	CoordTf::VECTOR3 normal = {};
-	CoordTf::VECTOR3 tangent = {};
-	CoordTf::VECTOR3 geoNormal = {};
-	CoordTf::VECTOR2 tex0 = {};
-	CoordTf::VECTOR2 tex1 = {};
-};
-
-struct Skin_VERTEX_Set {
-	Skin_VERTEX** pvVB = nullptr;
-	Vertex_M** pvVB_M = nullptr;
-	uint32_t*** newIndex = nullptr;
-	uint32_t** NumNewIndex = nullptr;
-};
+#include <stdexcept>
 
 class SkinMeshHelper {
 
-protected:
+public:
+	static const int MAX_BONES = 256;
+	static const int FBX_PCS = 32;
+
+	struct Skin_VERTEX {
+		CoordTf::VECTOR3 vPos = {};
+		CoordTf::VECTOR3 vNorm = {};
+		CoordTf::VECTOR3 vTangent = {};
+		CoordTf::VECTOR3 vGeoNorm = {};
+		CoordTf::VECTOR2 vTex0 = {};
+		CoordTf::VECTOR2 vTex1 = {};
+		uint32_t bBoneIndex[4] = {};
+		float bBoneWeight[4] = {};
+	};
+
+	struct Vertex_M {
+		CoordTf::VECTOR3 Pos = {};
+		CoordTf::VECTOR3 normal = {};
+		CoordTf::VECTOR3 tangent = {};
+		CoordTf::VECTOR3 geoNormal = {};
+		CoordTf::VECTOR2 tex0 = {};
+		CoordTf::VECTOR2 tex1 = {};
+	};
+
+	struct Skin_VERTEX_Set {
+		Skin_VERTEX** pvVB = nullptr;
+		Vertex_M** pvVB_M = nullptr;
+		uint32_t*** newIndex = nullptr;
+		uint32_t** NumNewIndex = nullptr;
+	};
+
 	struct BONE {
 		CoordTf::MATRIX mBindPose;//初期ポーズ
 		CoordTf::MATRIX mNewPose;//現在のポーズ
@@ -65,6 +66,33 @@ protected:
 		}
 	};
 
+	struct meshCenterPos {
+		CoordTf::VECTOR3 pos = {};
+		uint32_t bBoneIndex = {};
+		float bBoneWeight = {};
+	};
+
+	void noUseMeshIndex(int meshIndex);
+	void ObjCentering(bool f, int ind);
+	void ObjCentering(float x, float y, float z, float thetaZ, float thetaY, float thetaX, int ind);
+	void ObjOffset(float x, float y, float z, float thetaZ, float thetaY, float thetaX, int ind);
+	void SetConnectStep(int ind, float step);
+
+	void GetFbx(char* szFileName);
+	void GetFbxSetBinary(char* byteArray, unsigned int size);
+
+	int32_t getMaxEndframe(int fbxIndex, int InternalAnimationIndex);
+	int getNumMesh() { return numMesh; }
+
+	void GetFbxSub(char* szFileName, int ind);
+	void GetFbxSubSetBinary(char* byteArray, unsigned int size, int ind);
+	void GetBuffer_Sub(int ind, int num_end_frame, float* end_frame);
+	void GetBuffer_Sub(int ind, float end_frame);
+	void CreateFromFBX_SubAnimation(int ind);
+
+	void setDirectTime(float ti);
+
+private:
 	class SkinMesh_sub {
 	public:
 		FbxLoader* fbxL = nullptr;
@@ -85,20 +113,12 @@ protected:
 		bool CreateSetBinary(char* byteArray, unsigned int size);
 	};
 
-	SHADER_GLOBAL_BONES sgb[2] = {};
-
 	//ボーン
 	int* numBone = nullptr;
-	int maxNumBone = 0;
 	int maxNumBoneMeshIndex = 0;
 	BONE* m_BoneArray = nullptr;
 	char* boneName = nullptr;
 
-	struct meshCenterPos {
-		CoordTf::VECTOR3 pos = {};
-		uint32_t bBoneIndex = {};
-		float bBoneWeight = {};
-	};
 	std::unique_ptr<meshCenterPos[]> centerPos = nullptr;
 
 	//FBX
@@ -117,40 +137,30 @@ protected:
 	bool InitFBXSetBinary(char* byteArray, unsigned int size, int p);
 	void CreateRotMatrix(float thetaZ, float thetaY, float thetaX, int ind);
 	void ReadSkinInfo(FbxMeshNode* mesh, Skin_VERTEX* tmpVB, meshCenterPos* centerPos);
-	CoordTf::MATRIX GetCurrentPoseMatrix(int index);
-	void MatrixMap_Bone(SHADER_GLOBAL_BONES* sbB);
-	bool SetNewPoseMatrices(float time, int ind, int InternalAnimationIndex);
 	void normalRecalculation(bool lclOn, double** nor, FbxMeshNode* mesh);
 	void createAxis();
 	void AxisSw(bool axisOn);
 	void LclTransformation(FbxMeshNode* mesh, CoordTf::VECTOR3* vec);
 	void splitIndex(uint32_t numMaterial, FbxMeshNode* mesh, int meshIndex, Skin_VERTEX_Set& vset);
 
-	void getBuffer(int num_end_frame, float* end_frame, bool singleMesh, bool deformer);
-	Skin_VERTEX_Set setVertex(bool lclOn, bool axisOn, bool VerCentering);
+protected:
+	int maxNumBone = 0;
+	SHADER_GLOBAL_BONES sgb[2] = {};
 
 	SkinMeshHelper();
 	~SkinMeshHelper();
 
-public:
-	void noUseMeshIndex(int meshIndex);
-	void ObjCentering(bool f, int ind);
-	void ObjCentering(float x, float y, float z, float thetaZ, float thetaY, float thetaX, int ind);
-	void ObjOffset(float x, float y, float z, float thetaZ, float thetaY, float thetaX, int ind);
-	void SetConnectStep(int ind, float step);
-	bool GetFbx(char* szFileName);
-	bool GetFbxSetBinary(char* byteArray, unsigned int size);
+	CoordTf::MATRIX GetCurrentPoseMatrix(int index);
+	bool SetNewPoseMatrices(float time, int ind, int InternalAnimationIndex);
+	void MatrixMap_Bone(SHADER_GLOBAL_BONES* sbB);
 
-	int32_t getMaxEndframe(int fbxIndex, int InternalAnimationIndex);
-	int getNumMesh() { return numMesh; }
+	void getBuffer(int num_end_frame, float* end_frame, bool singleMesh, bool deformer);
+	Skin_VERTEX_Set setVertex(bool lclOn, bool axisOn, bool VerCentering);
 
-	bool GetFbxSub(char* szFileName, int ind);
-	bool GetFbxSubSetBinary(char* byteArray, unsigned int size, int ind);
-	bool GetBuffer_Sub(int ind, int num_end_frame, float* end_frame);
-	bool GetBuffer_Sub(int ind, float end_frame);
-	void CreateFromFBX_SubAnimation(int ind);
-
-	void setDirectTime(float ti);
+	int getNumBone(int index);
+	FbxLoader* getFbxLoader();
+	meshCenterPos getMeshCenterPos(int index);
+	bool isNoUseMesh(int index);
 };
 
 #endif
