@@ -9,9 +9,9 @@
 
 namespace {
 	template<typename TYPE>
-	void S_DELETE(TYPE p) { if (p) { delete p;    p = nullptr; } }
+	void S_DELETE(TYPE& p) { if (p) { delete p;    p = nullptr; } }
 	template<typename TYPE>
-	void A_DELETE(TYPE p) { if (p) { delete[] p;    p = nullptr; } }
+	void A_DELETE(TYPE& p) { if (p) { delete[] p;    p = nullptr; } }
 
 	CoordTf::VECTOR3 normalRecalculation_sub(CoordTf::VECTOR3 N[3]) {
 		using namespace CoordTf;
