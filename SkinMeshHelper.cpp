@@ -178,13 +178,13 @@ CoordTf::MATRIX SkinMeshHelper::GetCurrentPoseMatrix(int index) {
 	return ret;
 }
 
-void SkinMeshHelper::MatrixMap_Bone(SHADER_GLOBAL_BONES* sgb) {
+void SkinMeshHelper::MatrixMap_Bone(SHADER_GLOBAL_BONES* sbB, bool isTranspose) {
 
 	using namespace CoordTf;
 	for (int i = 0; i < maxNumBone; i++)
 	{
 		MATRIX mat = GetCurrentPoseMatrix(i);
-		MatrixTranspose(&mat);
+		if (isTranspose)MatrixTranspose(&mat);
 		sgb->mBone[i] = mat;
 	}
 }

@@ -152,7 +152,7 @@ protected:
 
 	CoordTf::MATRIX GetCurrentPoseMatrix(int index);
 	bool SetNewPoseMatrices(float time, int ind, int InternalAnimationIndex);
-	void MatrixMap_Bone(SHADER_GLOBAL_BONES* sbB);
+	void MatrixMap_Bone(SHADER_GLOBAL_BONES* sbB, bool isTranspose = true);
 
 	void getBuffer(int num_end_frame, float* end_frame, bool singleMesh, bool deformer);
 	Skin_VERTEX_Set setVertex(bool lclOn, bool axisOn, bool VerCentering);
