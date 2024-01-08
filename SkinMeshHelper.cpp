@@ -185,7 +185,7 @@ void SkinMeshHelper::MatrixMap_Bone(SHADER_GLOBAL_BONES* sbB, bool isTranspose) 
 	{
 		MATRIX mat = GetCurrentPoseMatrix(i);
 		if (isTranspose)MatrixTranspose(&mat);
-		sgb->mBone[i] = mat;
+		sbB->mBone[i] = mat;
 	}
 }
 
