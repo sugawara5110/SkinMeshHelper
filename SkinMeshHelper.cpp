@@ -37,6 +37,57 @@ namespace {
 			break;
 		}
 	}
+
+	CoordTf::MATRIX LclRotationMatrix(Lcl& lcl) {
+		using namespace CoordTf;
+		MATRIX rotZ, rotY, rotX;
+		MatrixRotationZ(&rotZ, (float)lcl.Rotation[2]);
+		MatrixRotationY(&rotY, (float)lcl.Rotation[1]);
+		MatrixRotationX(&rotX, (float)lcl.Rotation[0]);
+		return rotZ * rotY * rotX;
+	}
+
+	CoordTf::MATRIX LclWorldMatrix(Lcl& lcl) {
+		using namespace CoordTf;
+		MATRIX mov;
+		MATRIX rotZYX;
+		MATRIX scale;
+
+		MatrixScaling(&scale,
+			(float)lcl.Scaling[0],
+			(float)lcl.Scaling[1],
+			(float)lcl.Scaling[2]);
+
+		rotZYX = LclRotationMatrix(lcl);
+
+		MatrixTranslation(&mov,
+			(float)lcl.Translation[0],
+			(float)lcl.Translation[1],
+			(float)lcl.Translation[2]);
+
+		return scale * rotZYX * mov;
+	}
+
+	void LclTransformationVector(Lcl& lcl, CoordTf::VECTOR3* vec_in_out) {
+		using namespace CoordTf;
+		MATRIX world = LclWorldMatrix(lcl);
+
+		VectorMatrixMultiply(vec_in_out, &world);
+	}
+
+	CoordTf::MATRIX LclTransformationMatrix(Lcl& lcl, CoordTf::MATRIX* mat_in) {
+		using namespace CoordTf;
+		MATRIX world = LclWorldMatrix(lcl);
+
+		return (*mat_in) * world;
+	}
+
+	void LclRotationConversionVector(Lcl& lcl, CoordTf::VECTOR3* vec_in_out) {
+		using namespace CoordTf;
+		MATRIX rot = LclRotationMatrix(lcl);
+
+		VectorMatrixMultiply(vec_in_out, &rot);
+	}
 }
 
 SkinMeshHelper::SkinMesh_sub::SkinMesh_sub() {
@@ -167,15 +218,10 @@ void SkinMeshHelper::ReadSkinInfo(FbxMeshNode* mesh, Skin_VERTEX* tmpVB, meshCen
 CoordTf::MATRIX SkinMeshHelper::GetCurrentPoseMatrix(int index) {
 	using namespace CoordTf;
 	MATRIX inv;
-	MatrixIdentity(&inv);
 	MatrixInverse(&inv, &m_BoneArray[index].mBindPose);//FBXのバインドポーズは初期姿勢（絶対座標）
-	MATRIX fPose;
-	MatrixIdentity(&fPose);
-	MatrixMultiply(&fPose, &inv, &m_BoneArray[index].mNewPose);//バインドポーズの逆行列とフレーム姿勢行列をかける
-	MATRIX ret;
-	MatrixIdentity(&ret);
-	MatrixMultiply(&ret, &fPose, &Axis);
-	return ret;
+
+	MATRIX fPose = inv * m_BoneArray[index].mNewPose;//バインドポーズの逆行列とフレーム姿勢行列をかける
+	return fPose * Axis;
 }
 
 void SkinMeshHelper::MatrixMap_Bone(SHADER_GLOBAL_BONES* sbB, bool isTranspose) {
@@ -314,7 +360,7 @@ void SkinMeshHelper::normalRecalculation(bool lclOn, double** nor, FbxMeshNode* 
 					(float)ver[index[ind] * 3 + 2]
 				);
 				if (lclOn) {
-					LclTransformation(mesh, &tmpv[i1]);
+					LclTransformationVector(mesh->getLcl(), &tmpv[i1]);
 				}
 			}
 			//上記3頂点から法線の方向算出
@@ -352,35 +398,6 @@ void SkinMeshHelper::createAxis() {
 	Axis._41 = 0.0f;       Axis._42 = 0.0f;       Axis._43 = 0.0f;       Axis._44 = 1.0f;
 
 	Axis = Axis * scale;
-}
-
-void SkinMeshHelper::LclTransformation(FbxMeshNode* mesh, CoordTf::VECTOR3* vec) {
-	using namespace CoordTf;
-	MATRIX mov;
-	MATRIX rotZ, rotY, rotX, rotZY, rotZYX;
-	MATRIX scale;
-	MATRIX scro;
-	MATRIX world;
-
-	MatrixScaling(&scale,
-		(float)mesh->getLcl().Scaling[0],
-		(float)mesh->getLcl().Scaling[1],
-		(float)mesh->getLcl().Scaling[2]);
-
-	MatrixRotationZ(&rotZ, (float)mesh->getLcl().Rotation[2]);
-	MatrixRotationY(&rotY, (float)mesh->getLcl().Rotation[1]);
-	MatrixRotationX(&rotX, (float)mesh->getLcl().Rotation[0]);
-	MatrixMultiply(&rotZY, &rotZ, &rotY);
-	MatrixMultiply(&rotZYX, &rotZY, &rotX);
-
-	MatrixTranslation(&mov,
-		(float)mesh->getLcl().Translation[0],
-		(float)mesh->getLcl().Translation[1],
-		(float)mesh->getLcl().Translation[2]);
-
-	MatrixMultiply(&scro, &scale, &rotZYX);
-	MatrixMultiply(&world, &scro, &mov);
-	VectorMatrixMultiply(vec, &world);
 }
 
 void SkinMeshHelper::SetConnectStep(int ind, float step) {
@@ -483,7 +500,7 @@ SkinMeshHelper::Skin_VERTEX_Set SkinMeshHelper::setVertex(bool lclOn, bool axisO
 			v->vPos.y = (float)ver[index[i] * 3 + 1];
 			v->vPos.z = (float)ver[index[i] * 3 + 2];
 			if (lclOn) {
-				LclTransformation(mesh, &v->vPos);
+				LclTransformationVector(mesh->getLcl(), &v->vPos);
 			}
 			cpp.x += vm->Pos.x = v->vPos.x;
 			cpp.y += vm->Pos.y = v->vPos.y;
@@ -502,12 +519,17 @@ SkinMeshHelper::Skin_VERTEX_Set SkinMeshHelper::setVertex(bool lclOn, bool axisO
 				uvInd = index[i];
 			}
 
-			vm->normal.x = v->vNorm.x = (float)nor[norInd * 3];
-			vm->normal.y = v->vNorm.y = (float)nor[norInd * 3 + 1];
-			vm->normal.z = v->vNorm.z = (float)nor[norInd * 3 + 2];
-			vm->geoNormal.x = v->vGeoNorm.x = (float)nor[norInd * 3];
-			vm->geoNormal.y = v->vGeoNorm.y = (float)nor[norInd * 3 + 1];
-			vm->geoNormal.z = v->vGeoNorm.z = (float)nor[norInd * 3 + 2];
+			v->vNorm.x = (float)nor[norInd * 3];
+			v->vNorm.y = (float)nor[norInd * 3 + 1];
+			v->vNorm.z = (float)nor[norInd * 3 + 2];
+			if (lclOn) {
+				LclRotationConversionVector(mesh->getLcl(), &v->vNorm);
+				CoordTf::VECTOR3 temp = v->vNorm;
+				CoordTf::VectorNormalize(&v->vNorm, &temp);
+			}
+			vm->geoNormal.x = v->vGeoNorm.x = vm->normal.x = v->vNorm.x;
+			vm->geoNormal.y = v->vGeoNorm.y = vm->normal.y = v->vNorm.y;
+			vm->geoNormal.z = v->vGeoNorm.z = vm->normal.z = v->vNorm.z;
 			vm->tex0.x = v->vTex0.x = (float)uv0[uvInd * 2];
 			vm->tex0.y = v->vTex0.y = 1.0f - (float)uv0[uvInd * 2 + 1];//(1.0f-UV)
 			vm->tex1.x = v->vTex1.x = (float)uv1[uvInd * 2];

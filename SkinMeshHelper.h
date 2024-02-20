@@ -140,7 +140,6 @@ private:
 	void normalRecalculation(bool lclOn, double** nor, FbxMeshNode* mesh);
 	void createAxis();
 	void AxisSw(bool axisOn);
-	void LclTransformation(FbxMeshNode* mesh, CoordTf::VECTOR3* vec);
 	void splitIndex(uint32_t numMaterial, FbxMeshNode* mesh, int meshIndex, Skin_VERTEX_Set& vset);
 
 protected:
