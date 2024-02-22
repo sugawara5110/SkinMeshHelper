@@ -44,13 +44,13 @@ namespace {
 		MatrixRotationZ(&rotZ, (float)lcl.Rotation[2]);
 		MatrixRotationY(&rotY, (float)lcl.Rotation[1]);
 		MatrixRotationX(&rotX, (float)lcl.Rotation[0]);
-		return rotZ * rotY * rotX;
+		return rotX * rotY * rotZ;
 	}
 
 	CoordTf::MATRIX LclWorldMatrix(Lcl& lcl) {
 		using namespace CoordTf;
 		MATRIX mov;
-		MATRIX rotZYX;
+		MATRIX rot;
 		MATRIX scale;
 
 		MatrixScaling(&scale,
@@ -58,14 +58,14 @@ namespace {
 			(float)lcl.Scaling[1],
 			(float)lcl.Scaling[2]);
 
-		rotZYX = LclRotationMatrix(lcl);
+		rot = LclRotationMatrix(lcl);
 
 		MatrixTranslation(&mov,
 			(float)lcl.Translation[0],
 			(float)lcl.Translation[1],
 			(float)lcl.Translation[2]);
 
-		return scale * rotZYX * mov;
+		return scale * rot * mov;
 	}
 
 	void LclTransformationVector(Lcl& lcl, CoordTf::VECTOR3* vec_in_out) {
@@ -73,13 +73,6 @@ namespace {
 		MATRIX world = LclWorldMatrix(lcl);
 
 		VectorMatrixMultiply(vec_in_out, &world);
-	}
-
-	CoordTf::MATRIX LclTransformationMatrix(Lcl& lcl, CoordTf::MATRIX* mat_in) {
-		using namespace CoordTf;
-		MATRIX world = LclWorldMatrix(lcl);
-
-		return (*mat_in) * world;
 	}
 
 	void LclRotationConversionVector(Lcl& lcl, CoordTf::VECTOR3* vec_in_out) {
