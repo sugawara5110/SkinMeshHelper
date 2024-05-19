@@ -353,7 +353,8 @@ void SkinMeshHelper::normalRecalculation(bool lclOn, double** nor, FbxMeshNode* 
 					(float)ver[index[ind] * 3 + 2]
 				);
 				if (lclOn) {
-					LclTransformationVector(mesh->getLcl(), &tmpv[i1]);
+					Lcl in = mesh->getLcl();
+					LclTransformationVector(in, &tmpv[i1]);
 				}
 			}
 			//上記3頂点から法線の方向算出
@@ -493,7 +494,8 @@ SkinMeshHelper::Skin_VERTEX_Set SkinMeshHelper::setVertex(bool lclOn, bool axisO
 			v->vPos.y = (float)ver[index[i] * 3 + 1];
 			v->vPos.z = (float)ver[index[i] * 3 + 2];
 			if (lclOn) {
-				LclTransformationVector(mesh->getLcl(), &v->vPos);
+				Lcl in = mesh->getLcl();
+				LclTransformationVector(in, &v->vPos);
 			}
 			cpp.x += vm->Pos.x = v->vPos.x;
 			cpp.y += vm->Pos.y = v->vPos.y;
@@ -516,7 +518,8 @@ SkinMeshHelper::Skin_VERTEX_Set SkinMeshHelper::setVertex(bool lclOn, bool axisO
 			v->vNorm.y = (float)nor[norInd * 3 + 1];
 			v->vNorm.z = (float)nor[norInd * 3 + 2];
 			if (lclOn) {
-				LclRotationConversionVector(mesh->getLcl(), &v->vNorm);
+				Lcl in = mesh->getLcl();
+				LclRotationConversionVector(in, &v->vNorm);
 				CoordTf::VECTOR3 temp = v->vNorm;
 				CoordTf::VectorNormalize(&v->vNorm, &temp);
 			}
